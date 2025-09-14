@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
-	"regexp"
 	"strings"
 	"time"
 
@@ -18,17 +16,6 @@ var miniflux *client.Client
 var minifluxEndpoint string
 var feedTitle string
 var feedFormat string = "atom" // default format
-
-// cleanContent removes malformed fmt.Printf artifacts from content
-func cleanContent(content string) string {
-	// Remove malformed printf patterns like %!&(MISSING)
-	re := regexp.MustCompile(`%![^\s]*\(MISSING\)`)
-	content = re.ReplaceAllString(content, "")
-	// Also clean up standalone %! patterns
-	re2 := regexp.MustCompile(`%![^\s<>"]*`)
-	content = re2.ReplaceAllString(content, "")
-	return content
-}
 
 func httpHandler(w http.ResponseWriter, r *http.Request) {
 	// Determine format from path or use default
@@ -67,7 +54,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 		feed.Items = append(feed.Items, &feeds.Item{
 			Title:       entry.Title,
 			Link:        &feeds.Link{Href: entry.URL},
-			Description: cleanContent(entry.Content),
+			Description: entry.Content,
 			Author:      &feeds.Author{Name: entry.Author},
 			Created:     entry.Date,
 		})
@@ -92,39 +79,30 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	APITokenFile := ""
 	APIToken := ""
-	formatFile := ""
 	listenAddress := ""
 	certFile := ""
 	keyFile := ""
 
 	// Read command line arguments
 	flag.StringVar(&minifluxEndpoint, "endpoint", "https://miniflux.example.org", "Miniflux server endpoint")
-	flag.StringVar(&APITokenFile, "api-token-file", "api_token", "Load Miniflux API token from file")
+	flag.StringVar(&APIToken, "api-token", "", "Miniflux API token")
 	flag.StringVar(&listenAddress, "listen-addr", "127.0.0.1:8080", "Listen on this address")
 	flag.StringVar(&feedTitle, "feed-title", "Starred entries", "Title of the feed")
-	flag.StringVar(&formatFile, "format-file", "", "Load feed format from file (atom or rss)")
+	flag.StringVar(&feedFormat, "format", "atom", "Feed format (atom or rss)")
 	flag.StringVar(&certFile, "tls-cert", "", "TLS certificate file path (skip to disable TLS)")
 	flag.StringVar(&keyFile, "tls-key", "", "TLS key file path (skip to disable TLS)")
 	flag.Parse()
 
-	// Load API token
-	dat, err := os.ReadFile(APITokenFile)
-	if err != nil {
-		log.Fatal(err)
+	// Validate API token
+	if APIToken == "" {
+		log.Fatal("API token is required. Use -api-token flag or set via environment")
 	}
-	APIToken = strings.TrimSpace(string(dat))
+	APIToken = strings.TrimSpace(APIToken)
 
-	// Load format if file specified
-	if formatFile != "" {
-		formatData, err := os.ReadFile(formatFile)
-		if err == nil {
-			format := strings.TrimSpace(string(formatData))
-			if format == "rss" || format == "atom" {
-				feedFormat = format
-			}
-		}
+	// Validate format
+	if feedFormat != "atom" && feedFormat != "rss" {
+		log.Fatal("Invalid format. Must be 'atom' or 'rss'")
 	}
 
 	// Authentication using API token then fetch starred items

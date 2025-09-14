@@ -17,3 +17,9 @@ The service provides the following endpoints:
 ```bash
 docker run -e MINIFLUX_API_TOKEN=your_token -e FEED_FORMAT=rss miniflux-luma
 ```
+
+## How it works
+
+The Docker entrypoint script converts environment variables to command-line arguments:
+- `MINIFLUX_API_TOKEN` → `-api-token`
+- `FEED_FORMAT` → `-format`
