@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"regexp"
 	"strings"
 	"time"
 
@@ -16,8 +17,28 @@ import (
 var miniflux *client.Client
 var minifluxEndpoint string
 var feedTitle string
+var feedFormat string
+
+// cleanContent removes malformed fmt.Printf artifacts from content
+func cleanContent(content string) string {
+	// Remove malformed printf patterns like %!&(MISSING)
+	re := regexp.MustCompile(`%![^\s]*\(MISSING\)`)
+	content = re.ReplaceAllString(content, "")
+	// Also clean up standalone %! patterns
+	re2 := regexp.MustCompile(`%![^\s<>"]*`)
+	content = re2.ReplaceAllString(content, "")
+	return content
+}
 
 func httpHandler(w http.ResponseWriter, r *http.Request) {
+	// Determine format from path or use default
+	format := feedFormat
+	if strings.HasSuffix(r.URL.Path, "/rss") {
+		format = "rss"
+	} else if strings.HasSuffix(r.URL.Path, "/atom") {
+		format = "atom"
+	}
+
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("X-Frame-Options", "DENY")
@@ -46,18 +67,28 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 		feed.Items = append(feed.Items, &feeds.Item{
 			Title:       entry.Title,
 			Link:        &feeds.Link{Href: entry.URL},
-			Description: entry.Content,
+			Description: cleanContent(entry.Content),
 			Author:      &feeds.Author{Name: entry.Author},
 			Created:     entry.Date,
 		})
 	}
 
-	// Print atom feed
-	atom, err := feed.ToAtom()
-	if err != nil {
-		log.Fatal(err)
+	// Generate feed in requested format
+	var output string
+	if format == "rss" {
+		rss, err := feed.ToRss()
+		if err != nil {
+			log.Fatal(err)
+		}
+		output = rss
+	} else {
+		atom, err := feed.ToAtom()
+		if err != nil {
+			log.Fatal(err)
+		}
+		output = atom
 	}
-	fmt.Fprintf(w, atom)
+	fmt.Fprintf(w, output)
 }
 
 func main() {
@@ -71,7 +102,8 @@ func main() {
 	flag.StringVar(&minifluxEndpoint, "endpoint", "https://miniflux.example.org", "Miniflux server endpoint")
 	flag.StringVar(&APITokenFile, "api-token-file", "api_token", "Load Miniflux API token from file")
 	flag.StringVar(&listenAddress, "listen-addr", "127.0.0.1:8080", "Listen on this address")
-	flag.StringVar(&feedTitle, "feed-title", "Starred entries", "Title of the Atom feed")
+	flag.StringVar(&feedTitle, "feed-title", "Starred entries", "Title of the feed")
+	flag.StringVar(&feedFormat, "format", "atom", "Default feed format (atom or rss)")
 	flag.StringVar(&certFile, "tls-cert", "", "TLS certificate file path (skip to disable TLS)")
 	flag.StringVar(&keyFile, "tls-key", "", "TLS key file path (skip to disable TLS)")
 	flag.Parse()
@@ -88,7 +120,9 @@ func main() {
 
 	// Start web server
 	http.HandleFunc("/", httpHandler)
-	log.Printf("Listening on %s\n", listenAddress)
+	http.HandleFunc("/rss", httpHandler)
+	http.HandleFunc("/atom", httpHandler)
+	log.Printf("Listening on %s (format: %s)\n", listenAddress, feedFormat)
 	if certFile != "" && keyFile != "" {
 		log.Fatal(http.ListenAndServeTLS(listenAddress, certFile, keyFile, nil))
 	} else {
