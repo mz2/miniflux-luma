@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/gorilla/feeds"
+	"github.com/microcosm-cc/bluemonday"
 	"miniflux.app/client"
 )
 
@@ -16,6 +17,15 @@ var miniflux *client.Client
 var minifluxEndpoint string
 var feedTitle string
 var feedFormat string = "atom" // default format
+var htmlPolicy *bluemonday.Policy
+
+func init() {
+	// Create a policy that allows common HTML but sanitizes problematic content
+	// This will clean up malformed HTML, fix broken entities, and ensure valid XML
+	htmlPolicy = bluemonday.UGCPolicy()
+	// UGCPolicy is quite permissive but still sanitizes dangerous content
+	// It allows formatting, links, images, etc. while fixing malformed HTML
+}
 
 func httpHandler(w http.ResponseWriter, r *http.Request) {
 	// Determine format from path or use default
@@ -51,10 +61,14 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 		Items:   []*feeds.Item{},
 	}
 	for _, entry := range entries.Entries {
+		// Sanitize HTML content to ensure valid XML output
+		// This fixes malformed HTML, broken entities, and other issues
+		sanitizedContent := htmlPolicy.Sanitize(entry.Content)
+
 		feed.Items = append(feed.Items, &feeds.Item{
 			Title:       entry.Title,
 			Link:        &feeds.Link{Href: entry.URL},
-			Description: entry.Content,
+			Description: sanitizedContent,
 			Author:      &feeds.Author{Name: entry.Author},
 			Created:     entry.Date,
 		})
