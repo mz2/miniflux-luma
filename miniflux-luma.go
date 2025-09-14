@@ -17,7 +17,7 @@ import (
 var miniflux *client.Client
 var minifluxEndpoint string
 var feedTitle string
-var feedFormat string
+var feedFormat string = "atom" // default format
 
 // cleanContent removes malformed fmt.Printf artifacts from content
 func cleanContent(content string) string {
@@ -94,6 +94,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 func main() {
 	APITokenFile := ""
 	APIToken := ""
+	formatFile := ""
 	listenAddress := ""
 	certFile := ""
 	keyFile := ""
@@ -103,7 +104,7 @@ func main() {
 	flag.StringVar(&APITokenFile, "api-token-file", "api_token", "Load Miniflux API token from file")
 	flag.StringVar(&listenAddress, "listen-addr", "127.0.0.1:8080", "Listen on this address")
 	flag.StringVar(&feedTitle, "feed-title", "Starred entries", "Title of the feed")
-	flag.StringVar(&feedFormat, "format", "atom", "Default feed format (atom or rss)")
+	flag.StringVar(&formatFile, "format-file", "", "Load feed format from file (atom or rss)")
 	flag.StringVar(&certFile, "tls-cert", "", "TLS certificate file path (skip to disable TLS)")
 	flag.StringVar(&keyFile, "tls-key", "", "TLS key file path (skip to disable TLS)")
 	flag.Parse()
@@ -114,6 +115,17 @@ func main() {
 		log.Fatal(err)
 	}
 	APIToken = strings.TrimSpace(string(dat))
+
+	// Load format if file specified
+	if formatFile != "" {
+		formatData, err := os.ReadFile(formatFile)
+		if err == nil {
+			format := strings.TrimSpace(string(formatData))
+			if format == "rss" || format == "atom" {
+				feedFormat = format
+			}
+		}
+	}
 
 	// Authentication using API token then fetch starred items
 	miniflux = client.New(minifluxEndpoint, APIToken)

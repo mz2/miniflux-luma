@@ -4,10 +4,11 @@ set -e
 if [ -n "$MINIFLUX_API_TOKEN" ]; then
   echo "$MINIFLUX_API_TOKEN" > /tmp/api_token
 
-  # Set feed format from environment variable, default to atom
+  # Write feed format to file if specified
   FORMAT_ARG=""
   if [ -n "$FEED_FORMAT" ]; then
-    FORMAT_ARG="-format $FEED_FORMAT"
+    echo "$FEED_FORMAT" > /tmp/feed_format
+    FORMAT_ARG="-format-file /tmp/feed_format"
   fi
 
   exec ./miniflux-luma -api-token-file /tmp/api_token $FORMAT_ARG "$@"
