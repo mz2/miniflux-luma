@@ -17,6 +17,7 @@ var miniflux *client.Client
 var minifluxEndpoint string
 var feedTitle string
 var feedFormat string = "atom" // default format
+var feedLimit int = 10 // default to 10 items for backward compatibility
 var htmlPolicy *bluemonday.Policy
 
 func init() {
@@ -42,12 +43,16 @@ func httpHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 
 	// Get new entries
-	entries, err := miniflux.Entries(&client.Filter{
-		Limit:     10,
+	filter := &client.Filter{
 		Order:     "published_at",
 		Direction: "desc",
 		Starred:   "1",
-	})
+	}
+	// Only set limit if specified (0 means get all)
+	if feedLimit > 0 {
+		filter.Limit = feedLimit
+	}
+	entries, err := miniflux.Entries(filter)
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -104,6 +109,7 @@ func main() {
 	flag.StringVar(&listenAddress, "listen-addr", "127.0.0.1:8080", "Listen on this address")
 	flag.StringVar(&feedTitle, "feed-title", "Starred entries", "Title of the feed")
 	flag.StringVar(&feedFormat, "format", "atom", "Feed format (atom or rss)")
+	flag.IntVar(&feedLimit, "limit", 10, "Maximum number of entries (0 for all)")
 	flag.StringVar(&certFile, "tls-cert", "", "TLS certificate file path (skip to disable TLS)")
 	flag.StringVar(&keyFile, "tls-key", "", "TLS key file path (skip to disable TLS)")
 	flag.Parse()

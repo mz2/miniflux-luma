@@ -4,6 +4,7 @@
 
 - `MINIFLUX_API_TOKEN` (required): Your Miniflux API token
 - `FEED_FORMAT` (optional): Feed format - `atom` (default) or `rss`
+- `FEED_LIMIT` (optional): Maximum number of entries - `10` (default) or `0` for all items
 
 ## Endpoints
 
@@ -23,3 +24,4 @@ docker run -e MINIFLUX_API_TOKEN=your_token -e FEED_FORMAT=rss miniflux-luma
 The Docker entrypoint script converts environment variables to command-line arguments:
 - `MINIFLUX_API_TOKEN` → `-api-token`
 - `FEED_FORMAT` → `-format`
+- `FEED_LIMIT` → `-limit`

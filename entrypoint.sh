@@ -10,4 +10,7 @@ fi
 # Set feed format from environment variable, default to atom
 FORMAT="${FEED_FORMAT:-atom}"
 
-exec ./miniflux-luma -api-token "$MINIFLUX_API_TOKEN" -format "$FORMAT" "$@"
+# Set feed limit from environment variable, default to 10
+LIMIT="${FEED_LIMIT:-10}"
+
+exec ./miniflux-luma -api-token "$MINIFLUX_API_TOKEN" -format "$FORMAT" -limit "$LIMIT" "$@"
